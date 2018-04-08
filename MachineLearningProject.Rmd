@@ -1,0 +1,122 @@
+---
+title: "Machine Learning Coursera project"
+author: "Savita Kohli"
+date: "April 7, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=F, warning=F)
+```
+##Practical Machine Learning Project : Prediction Assignment Writeup
+
+###Overview:
+####Human Activity Recognition - HAR - has emerged as a key research area in the last years and is gaining increasing attention by the pervasive computing research community,  especially for the development of context-aware systems. There are many potential applications for HAR, like: elderly monitoring, life log systems for monitoring energy expenditure and for supporting weight-loss programs, and digital assistants for weight lifting exercises.
+####Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+####Data being analyzed here is downloaded from https://d396qusza40orc.cloudfront.net/predmachlearn/. Original source of data is  http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har.
+####The goal of this project is to predict the manner in which they did the exercise. Outcome is 'classe' variable in the training set.
+
+###Loading libraries
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+library(knitr)
+```
+
+###Following will be sequence of activities:
+####1. Load both training and testing data into R. Further divide the training data into 70:30 ratio for training and test validation. Original testing data will be used to predict 20 cases for the quiz
+####2. Preprocessing the training data. Remove columns which have more than 95% 'NAs' or missing values 
+####3. Build Multiple models on the training data
+####4. Use the models to predict on Testing data (30% of population)
+####5. Run accuracy tests on the predicted values
+####6. Select the highest accuracy model and predict values for 20 cases in testing data.
+
+###1. Load data into R and create partitions of the data
+
+```{r}
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+
+inTrain <- createDataPartition(training$classe, p=0.7, list=FALSE)
+myTraining <- training[inTrain, ]
+myTesting <- training[-inTrain, ]
+dim(myTraining); dim(myTesting)
+```
+
+###2. Preprocessing data by removing columns with more than 95% NAs 
+
+```{r}
+nzv <- nearZeroVar(myTraining, saveMetrics = T)
+myTraining <- myTraining[, nzv$nzv == FALSE]
+NAs <- sapply(myTraining, function(x) sum(is.na(x))/nrow(myTraining)) > .95
+myTraining_new <- myTraining[, NAs == FALSE]
+## first  column are identification only
+myTraining_new <- myTraining_new[, -(1)]
+myTesting_New <- myTesting[, names(myTesting) %in% names(myTraining_new)]
+dim(myTraining_new) ; dim(myTesting_New)
+
+```
+
+###3. Build Multiple models on the training data and 
+###4. Use the models to predict on Testing data (30% of population)
+
+####Model rpart - fit classification tree as a model
+```{r}
+trControl <- trainControl(method="cv", number=3)
+
+model_rpart <- rpart(classe ~ ., data=myTraining_new, method="class")
+trainpred_rpart <- predict(model_rpart, myTesting_New, type = "class")
+confMat_rpart <- confusionMatrix(trainpred_rpart, myTesting_New$classe)
+```
+
+####rf (random forest algorithm)
+
+```{r}
+model_RF <- randomForest::randomForest(classe ~ ., data = myTraining_new)
+trainpred_RF <- predict(model_RF,newdata=myTesting_New)
+confMatRF <- confusionMatrix(trainpred_RF, myTesting_New$classe)
+fancyRpartPlot(model_rpart)
+confMatRF$table
+histogram(trainpred_RF); plot(model_RF,main="Accuracy of Random forest model by number of predictors")
+```
+
+#### lda (linear discriminant analysis) model
+
+```{r}
+
+model_LDA <- train(classe~., data=myTraining_new, method="lda", trControl=trControl, verbose=FALSE)
+trainpred_LDA <- predict(model_LDA,newdata=myTesting_New)
+confMatLDA <- confusionMatrix(myTesting_New$classe,trainpred_LDA)
+confMatLDA$table
+##confMatLDA$overall
+```
+
+#### gbm (boosting model)
+
+```{r}
+model_GBM <- train(classe~., data=myTraining_new, method="gbm", trControl=trControl, verbose=FALSE)
+trainpred_GBM <- predict(model_GBM,newdata=myTesting_New)
+confMatGBM <- confusionMatrix(myTesting_New$classe,trainpred_GBM)
+confMatGBM$table
+##confMatGBM$overall
+```
+
+#### Display and compare accuracy of 4 models
+```{r}
+cbind(rpart = confMat_rpart$overall[1],RandomForest = confMatRF$overall[1], LDA = confMatLDA$overall[1], GBM = confMatGBM$overall[1] )
+```
+
+####Apply gbm model to predict 20 cases in testing data
+
+```{r}
+
+testing$classe <- predict(model_GBM, testing)
+testing$classe
+```
+
+
