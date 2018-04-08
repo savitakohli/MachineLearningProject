@@ -2,7 +2,9 @@
 title: "Machine Learning Coursera project"
 author: "Savita Kohli"
 date: "April 7, 2018"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -82,6 +84,12 @@ trainpred_RF <- predict(model_RF,newdata=myTesting_New)
 confMatRF <- confusionMatrix(trainpred_RF, myTesting_New$classe)
 fancyRpartPlot(model_rpart)
 confMatRF$table
+model_RF
+```
+
+####Out of Sample Error Rate = .09% as shown in the results of Rain Forest Model
+
+```{r}
 histogram(trainpred_RF); plot(model_RF,main="Accuracy of Random forest model by number of predictors")
 ```
 
@@ -114,6 +122,7 @@ cbind(rpart = confMat_rpart$overall[1],RandomForest = confMatRF$overall[1], LDA 
 ####Apply gbm model to predict 20 cases in testing data
 
 ```{r}
+model_GBM$finalModel
 
 testing$classe <- predict(model_GBM, testing)
 testing$classe
